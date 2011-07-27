@@ -32,6 +32,7 @@ com! -nargs=0 Sclr :exe "!svn cl --remove ".bufname('%')
 nmap <Leader>sr :call SvnModeDiff(expand('<cword>'))<CR>gg
 nmap <Leader>sf :call SvnModeExport()<CR>gg
 nmap <Leader>sa :call SvnAdd(bufname('%'))<CR>
+nmap <Leader>sd :call SvnModeDiffFiles(expand('<cword>'))<CR>
 
 fun! SvnChangeList(clname,file)
 	exe "!svn cl ".a:clname." ".a:file
@@ -154,8 +155,7 @@ endfunction
 fun! SvnModeDiff(rev)
 	if SvnMode()
 		" extract the rev number from the input
-		let matches = matchlist(a:rev,'[^0-9]*\([0-9:]*\)[^0-9]*')
-		let num = get(l:matches,1)
+		let num = SvnCleanRev(a:rev)
 		let file = SvnModeWindow('')
 		if l:num =~ ':'
 			let option = '-r'
@@ -168,6 +168,37 @@ fun! SvnModeDiff(rev)
 	else
 		call SvnModeError()
 	endif
+endfunction
+" given a revision string, displays both before and after files in diff mode
+fun! SvnModeDiffFiles(rev)
+	if SvnMode()
+		let num = SvnCleanRev(a:rev)
+		let file = SvnModeWindow('')
+		if l:num =~ ':'
+			let parts = split(l:num,':')
+			let start = l:parts[0]
+			let end = l:parts[1]
+		else
+			let start = l:num - 1
+			let end = l:num
+		endif
+		let fileParts = split(l:file,'/')
+		let fileName = l:fileParts[-1]
+		let startFile = '~/tmp/'.l:start.l:fileName
+		let endFile = '~/tmp/'.l:end.l:fileName
+		exe '!svn export -r '.l:start.' '.l:file.' '.l:startFile
+		exe '!svn export -r '.l:end.' '.l:file.' '.l:endFile
+		exe 'e '.l:endFile
+		diffthis
+		exe 'vsplit '.l:startFile
+		diffthis
+	endif
+endfunction
+" get a clean revision number from the given revision string
+fun! SvnCleanRev(rev)
+	let matches = matchlist(a:rev,'[^0-9]*\([0-9:]*\)[^0-9]*')
+	let num = get(l:matches,1)
+	return l:num
 endfunction
 fun! SvnModeExport()
 	if SvnMode()
